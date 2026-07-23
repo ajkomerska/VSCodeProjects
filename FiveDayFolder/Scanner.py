@@ -36,17 +36,14 @@ def _build_archive_path(archive_dir: Path, file_path: Path) -> Path:
 
 
 def archive_old_files(source_dir: Path = SOURCE_DIR, archive_dir: Path = ARCHIVE_DIR, days: int = ARCHIVE_AGE_DAYS) -> list[tuple[str, str]]:
-    """Move files older than the cutoff age into the archive directory without reprocessing archived files."""
+    """Delete files older than the cutoff age, including any already archived files."""
     archive_dir.mkdir(parents=True, exist_ok=True)
 
     cutoff_time = datetime.now() - timedelta(days=days)
-    moved_files: list[tuple[str, str]] = []
+    deleted_files: list[tuple[str, str]] = []
 
     for file_path in sorted(source_dir.rglob("*")):
         if not file_path.is_file():
-            continue
-
-        if file_path.is_relative_to(archive_dir):
             continue
 
         if file_path.name == Path(__file__).name:
@@ -54,11 +51,10 @@ def archive_old_files(source_dir: Path = SOURCE_DIR, archive_dir: Path = ARCHIVE
 
         last_modified = datetime.fromtimestamp(file_path.stat().st_mtime)
         if last_modified < cutoff_time:
-            archive_path = _build_archive_path(archive_dir, file_path)
-            shutil.move(str(file_path), str(archive_path))
-            moved_files.append((file_path.name, archive_path.name))
+            deleted_files.append((file_path.name, file_path.as_posix()))
+            file_path.unlink()
 
-    return moved_files
+    return deleted_files
 
 
 if __name__ == "__main__":
@@ -66,13 +62,13 @@ if __name__ == "__main__":
 
     while True:
         print(f"\nScanning {SOURCE_DIR} for files older than {ARCHIVE_AGE_DAYS} days...")
-        moved_files = archive_old_files()
+        deleted_files = archive_old_files()
 
-        if moved_files:
-            print("Moved the following files:")
-            for original_name, archived_name in moved_files:
-                print(f"- {original_name} -> {ARCHIVE_DIR.name}/{archived_name}")
+        if deleted_files:
+            print("Deleted the following files:")
+            for original_name, deleted_path in deleted_files:
+                print(f"- {original_name} -> {deleted_path}")
         else:
-            print("No files needed to be archived.")
+            print("No files needed to be deleted.")
 
         time.sleep(SCAN_INTERVAL_SECONDS)
