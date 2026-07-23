@@ -11,6 +11,28 @@ ARCHIVE_DIR = SOURCE_DIR / "@Archived"
 ARCHIVE_AGE_DAYS = 5
 # Code runs every 60 seconds.
 SCAN_INTERVAL_SECONDS = 60
+MAX_ARCHIVE_FILENAME_STEM_LENGTH = 100
+
+
+def _build_archive_path(archive_dir: Path, file_path: Path) -> Path:
+    """Return a safe archive path, avoiding filename growth on repeated collisions."""
+    archive_path = archive_dir / file_path.name
+    if not archive_path.exists():
+        return archive_path
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    suffix = file_path.suffix
+    safe_stem = file_path.stem[:MAX_ARCHIVE_FILENAME_STEM_LENGTH].rstrip(". ")
+    if not safe_stem:
+        safe_stem = "archive"
+
+    archive_path = archive_dir / f"{safe_stem}_{timestamp}{suffix}"
+    counter = 1
+    while archive_path.exists():
+        archive_path = archive_dir / f"{safe_stem}_{timestamp}_{counter}{suffix}"
+        counter += 1
+
+    return archive_path
 
 
 def archive_old_files(source_dir: Path = SOURCE_DIR, archive_dir: Path = ARCHIVE_DIR, days: int = ARCHIVE_AGE_DAYS) -> list[tuple[str, str]]:
@@ -32,14 +54,7 @@ def archive_old_files(source_dir: Path = SOURCE_DIR, archive_dir: Path = ARCHIVE
 
         last_modified = datetime.fromtimestamp(file_path.stat().st_mtime)
         if last_modified < cutoff_time:
-            archive_path = archive_dir / file_path.name
-
-            if archive_path.exists():
-                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                archive_path = archive_path.with_name(
-                    f"{archive_path.stem}_{timestamp}{archive_path.suffix}"
-                )
-
+            archive_path = _build_archive_path(archive_dir, file_path)
             shutil.move(str(file_path), str(archive_path))
             moved_files.append((file_path.name, archive_path.name))
 
