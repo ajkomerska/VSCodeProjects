@@ -14,7 +14,7 @@ SCAN_INTERVAL_SECONDS = 60
 
 
 def archive_old_files(source_dir: Path = SOURCE_DIR, archive_dir: Path = ARCHIVE_DIR, days: int = ARCHIVE_AGE_DAYS) -> list[tuple[str, str]]:
-    """Move files older than the cutoff age into the archive directory."""
+    """Move files older than the cutoff age into the archive directory without reprocessing archived files."""
     archive_dir.mkdir(parents=True, exist_ok=True)
 
     cutoff_time = datetime.now() - timedelta(days=days)
@@ -22,6 +22,9 @@ def archive_old_files(source_dir: Path = SOURCE_DIR, archive_dir: Path = ARCHIVE
 
     for file_path in sorted(source_dir.rglob("*")):
         if not file_path.is_file():
+            continue
+
+        if file_path.is_relative_to(archive_dir):
             continue
 
         if file_path.name == Path(__file__).name:
